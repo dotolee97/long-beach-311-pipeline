@@ -78,6 +78,9 @@ The metadata says status values are "Open, Closed, In Progress etc." but there i
 - Lots of E-Scooter cases close the same minute they're opened (Closed Referred). Averaging time-to-close across all types would make it look faster than it is.
 - Default API order is random-ish. First page on 10/30 was July data. Need order_by when paging.
 - Aggregate query without group_by returns the same row 10 times. Adding limit=1 fixes it.
+- /records limits: max 100 rows per request, and offset + limit can't go past 10,000. Paging with offset only reaches the first 10,000 rows.
+- /exports/jsonl downloads the whole dataset in one request. On 2026-11-23: 141.4 MB, 363,250 rows, 59.4 seconds. Row count matched total_count.
+- Lowest casenumber is 00001008 (2020-09-21). There are gaps in case numbers, so casenumber is only used as an ID, not for counting.
 
 ## Where the numbers came from
 
