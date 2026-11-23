@@ -1,6 +1,6 @@
 # Data source notes: Go Long Beach service requests
 
-Notes from exploring the dataset before building the pipeline. First explored 2026-10-30. Numbers below were refreshed on 2026-11-22.
+Notes from exploring the dataset before building the pipeline. First explored 2026-10-30. Numbers below were refreshed on 2026-11-22 unless noted.
 
 ## Source
 
@@ -69,18 +69,23 @@ The metadata says status values are "Open, Closed, In Progress etc." but there i
 | Street Repair | 17,182 |
 | Tree Maintenance | 17,055 |
 
+## Getting the data
+
+- `/records` limits: max 100 rows per request, and offset + limit can't go past 10,000. Paging with offset only reaches the first 10,000 rows (about 3% of the data). Found by testing: both limits return a 400 error with the rule in the message.
+- `/exports/jsonl` downloads the whole dataset in one request. On 2026-11-23: 141.4 MB, 363,250 rows, 59.4 seconds. Row count matched total_count.
+- Other export formats: json, csv, parquet, geojson, xlsx, and some map formats.
+- The JSON export is a plain list of records. It doesn't have the `total_count` / `results` wrapper that `/records` has.
+
 ## Things I noticed
 
 - Records change after they're created. Between 10/30 and 11/22, Duplicate went down by 37 and In Progress went down by 207, so cases move between statuses.
 - age_open doesn't update. A case from 7/20 still said 4 days in October.
 - Oldest open cases are from 2020. Case 00001011 has been "In Progress" since 2020-09-23. Probably abandoned, not really being worked on.
+- Lowest casenumber is 00001008 (2020-09-21). There are gaps in case numbers (1009 and 1010 are missing), so casenumber is only used as an ID, not for counting.
 - Times are UTC. 2026-07-25 03:03 UTC is 7/24 in Long Beach, so daily counts need to convert to Pacific. The metadata timezone is America/Los_Angeles.
 - Lots of E-Scooter cases close the same minute they're opened (Closed Referred). Averaging time-to-close across all types would make it look faster than it is.
 - Default API order is random-ish. First page on 10/30 was July data. Need order_by when paging.
 - Aggregate query without group_by returns the same row 10 times. Adding limit=1 fixes it.
-- /records limits: max 100 rows per request, and offset + limit can't go past 10,000. Paging with offset only reaches the first 10,000 rows.
-- /exports/jsonl downloads the whole dataset in one request. On 2026-11-23: 141.4 MB, 363,250 rows, 59.4 seconds. Row count matched total_count.
-- Lowest casenumber is 00001008 (2020-09-21). There are gaps in case numbers, so casenumber is only used as an ID, not for counting.
 
 ## Where the numbers came from
 
@@ -94,10 +99,12 @@ The metadata says status values are "Open, Closed, In Progress etc." but there i
 - Freshness: https://data.longbeach.gov/api/explore/v2.1/catalog/datasets/service-requests/records?select=max(createddate)%20as%20latest_created,max(closeddate)%20as%20latest_closed&limit=1
 - Statuses with no close date: https://data.longbeach.gov/api/explore/v2.1/catalog/datasets/service-requests/records?select=status,count(*)%20as%20n&where=closeddate%20is%20null&group_by=status
   - Only New, In Progress, and Duplicate show up. This is why "open" is defined by status and not by a missing closeddate.
+- Export formats: https://data.longbeach.gov/api/explore/v2.1/catalog/datasets/service-requests/exports
 
-## Still deciding
+## Decisions
 
-Full reload vs. only pulling changes. There's no last-updated column, so I can't just ask for changed records, and records do change (see statuses above). Undecided for now. I'll pick one when I write the extract code.
+- Raw data is saved as JSON Lines. It keeps the same structure the API sends (including nested fields like geolocation), and since there's one record per line it can be read as a stream instead of loading the whole file into memory.
+- Full refresh: every run downloads the whole dataset and replaces the raw table. The full export takes about a minute, and there's no last-updated column, so loading only changes could miss records that changed (like the Duplicate and In Progress counts moving). If the data got much bigger, I'd look at incremental loads or daily snapshots.
 
 Ideas to check later:
 
