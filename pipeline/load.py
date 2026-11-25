@@ -13,7 +13,7 @@ def get_connection():
     """Connect to the Postgres database running in Docker."""
     return psycopg.connect(
         host=os.getenv("POSTGRES_HOST", "localhost"),
-        port=os.getenv("POSTGRES_PORT", "5432"),
+        port=os.getenv("POSTGRES_PORT", "5433"),
         user=os.environ["POSTGRES_USER"],
         password=os.environ["POSTGRES_PASSWORD"],
         dbname=os.environ["POSTGRES_DB"],
